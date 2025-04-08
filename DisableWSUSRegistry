@@ -1,0 +1,8 @@
+# Stop the Windows Update service
+Stop-Service -Name wuauserv
+
+# Set the registry value to bypass WSUS
+Set-ItemProperty -Path "HKLM:\Software\Policies\Microsoft\Windows\WindowsUpdate\AU" -Name "UseWUServer" -Value 0
+
+# Start the Windows Update service
+Start-Service -Name wuauserv
