@@ -1,0 +1,20 @@
+# Install NuGet provider if not already installed
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+
+# Install PSWindowsUpdate module
+Install-Module -Name PSWindowsUpdate -Force -AllowClobber
+
+# Import the module
+Import-Module PSWindowsUpdate
+
+# Check for updates
+Write-Output "Checking for updates..."
+$updates = Get-WindowsUpdate
+
+# Install updates if available
+if ($updates) {
+    Write-Output "Installing updates..."
+    Install-WindowsUpdate -AcceptAll -AutoReboot
+} else {
+    Write-Output "No updates available."
+}
