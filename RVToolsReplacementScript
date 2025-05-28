@@ -1,0 +1,49 @@
+# Install ImportExcel module if not already installed
+if (-not (Get-Module -ListAvailable -Name ImportExcel)) {
+    Install-Module -Name ImportExcel -Scope CurrentUser -Force
+}
+
+# Connect to vCenter
+Connect-VIServer -Server "VCENTER SERVER NAME"
+
+# Collect data
+$vmInfo = Get-VM | Select-Object Name, PowerState, NumCpu, MemoryMB, `
+    @{N="VMToolsStatus";E={$_.ExtensionData.Guest.ToolsStatus}}, `
+    @{N="IPAddress";E={$_.Guest.IPAddress -join ", "}}, `
+    Guest, Host, Folder, ResourcePool
+
+$vmDisks = Get-VM | Get-HardDisk | Select-Object Parent, Name, CapacityGB, Filename, StorageFormat
+
+$vmSnapshots = Get-VM | Get-Snapshot | Select-Object VM, Name, Description, Created, SizeMB
+
+$hosts = Get-VMHost | Select-Object Name, Manufacturer, Model, Version, Build, ConnectionState, ProcessorType, MemoryTotalMB, CpuTotalMhz
+$datastores = Get-Datastore | Select-Object Name, FreeSpaceGB, CapacityGB, Type
+
+$orphanedVMs = Get-View -ViewType VirtualMachine | Where-Object { $_.Runtime.ConnectionState -eq "orphaned" } |
+    Select-Object Name, @{N="ConnectionState";E={$_.Runtime.ConnectionState}}
+
+# Corrected VM CPU Info
+$vmCPU = Get-VM | Select-Object Name,
+    @{N="vCPUs";E={$_.ExtensionData.Config.Hardware.NumCPU}},
+    @{N="CoresPerSocket";E={$_.ExtensionData.Config.Hardware.NumCoresPerSocket}},
+    @{N="Sockets";E={
+        $cores = $_.ExtensionData.Config.Hardware.NumCoresPerSocket
+        $vcpus = $_.ExtensionData.Config.Hardware.NumCPU
+        if ($cores -gt 0) { [math]::Ceiling($vcpus / $cores) } else { "Unknown" }
+    }},
+    @{N="TotalCores";E={$_.ExtensionData.Config.Hardware.NumCPU}}
+
+# Define Excel path
+$excelPath = "C:\Reports\RVTools_Clone_Report.xlsx"
+
+# Export each sheet to the same Excel file
+$vmInfo | Export-Excel -Path $excelPath -WorksheetName "VMInfo" -AutoSize
+$vmDisks | Export-Excel -Path $excelPath -WorksheetName "VMDisk" -AutoSize
+$vmSnapshots | Export-Excel -Path $excelPath -WorksheetName "VMSnapshots" -AutoSize
+$hosts | Export-Excel -Path $excelPath -WorksheetName "Hosts" -AutoSize
+$datastores | Export-Excel -Path $excelPath -WorksheetName "Datastores" -AutoSize
+$orphanedVMs | Export-Excel -Path $excelPath -WorksheetName "OrphanedVMs" -AutoSize
+$vmCPU | Export-Excel -Path $excelPath -WorksheetName "VMCPU" -AutoSize
+
+# Disconnect from vCenter
+Disconnect-VIServer -Confirm:$false
