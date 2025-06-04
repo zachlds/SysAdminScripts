@@ -1,0 +1,33 @@
+# Prompt for username
+$username = Read-Host -Prompt "Enter the username to delete"
+
+# Define the target OU
+$OU = "OU PATH"
+
+# Define log file
+$logFile = "C:\temp\profile_deletion_log.csv"
+"ComputerName,Status,Message" | Out-File -FilePath $logFile -Encoding UTF8
+
+# Get all computers in the OU
+$computers = Get-ADComputer -SearchBase $OU -Filter * | Select-Object -ExpandProperty Name
+
+foreach ($computer in $computers) {
+    try {
+        $profiles = Get-WmiObject -Class Win32_UserProfile -ComputerName $computer -ErrorAction Stop
+        $found = $false
+
+        foreach ($profile in $profiles) {
+            if ($profile.LocalPath -like "*\$username") {
+                $profile.Delete()
+                "$computer,Success,Profile for $username deleted." | Out-File -FilePath $logFile -Append -Encoding UTF8
+                $found = $true
+            }
+        }
+
+        if (-not $found) {
+            "$computer,Info,Profile for $username not found." | Out-File -FilePath $logFile -Append -Encoding UTF8
+        }
+    } catch {
+        "$computer,Failure,$($_.Exception.Message)" | Out-File -FilePath $logFile -Append -Encoding UTF8
+    }
+}
